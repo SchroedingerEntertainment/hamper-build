@@ -1,3 +1,9 @@
+![Human Made](https://img.shields.io/badge/content-human--made-brightgreen?logo=github) 
+
+*All files in this repository are created by humans. AI tools may be used for research, but no AI-generated content is included*
+
+---
+
 Hamper Build is a context-driven build system designed for modular game development.
 
 Instead of relying on manually maintained build descriptions, it derives build pipelines from the project's structure, package graph and resolved capabilities. Build targets are discovered through packages, dependencies are resolved through Parcel, and execution is composed through Hamper's data-driven pipeline model. This allows source modules, tools, assets and runtime components to participate in the same build graph without requiring a centralized build script
