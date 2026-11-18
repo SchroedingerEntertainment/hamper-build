@@ -1,0 +1,275 @@
+// Licensed to Schroedinger Entertainment (SOE) under the terms of the AGPLv3
+// Licensed to you by SOE under the terms of the AGPLv3 or another OSI-approved license 
+
+using System.Runtime.CompilerServices;
+using Soe.Collections.HashSet;
+using Soe.Composable;
+using Soe.Runtime;
+
+namespace Soe.Build
+{
+    /// <summary>
+    /// Represents the central processing pipeline to perform the user-requested operation
+    /// </summary>
+    #if EXPORT_HAMPER_BUILD_MAIN
+    public
+    #else
+    internal
+    #endif
+    static partial class ProcessingPipeline
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static ProcessingPipeline()
+        {
+            discoveryAdapter = new PipelineAdapter();
+            parsingAdapter = new PipelineAdapter();
+            lintingAdapter = new PipelineAdapter();
+            analysisAdapter = new PipelineAdapter();
+            classificationAdapter = new PipelineAdapter();
+            buildAdapter = new PipelineAdapter();
+            exportAdapter = new PipelineAdapter();
+        }
+        
+        private static ProcessingPhase current;
+        /// <summary>
+        /// Gets the current pipeline phase
+        /// </summary>
+        public static ProcessingPhase Current
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return current; }
+        }
+        
+        /// <summary>
+        /// Gets the current version of the provided processing stream
+        /// </summary>
+        /// <param name="phase">The <see cref="ProcessingPhase"/> indicating the stream</param>
+        /// <returns>The current version of the provided processing stream</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int GetCurrentVersion(ProcessingPhase phase)
+        {
+            switch (phase)
+            {
+                #region Discovery
+                case ProcessingPhase.Discovery: return discoveryAdapter.Version;
+                #endregion
+
+                #region Parsing
+                case ProcessingPhase.Parsing: return parsingAdapter.Version;
+                #endregion
+
+                #region Linting
+                case ProcessingPhase.Linting: return lintingAdapter.Version;
+                #endregion
+
+                #region Analysis
+                case ProcessingPhase.Analysis: return analysisAdapter.Version;
+                #endregion
+                
+                #region Classification
+                case ProcessingPhase.Classification: return classificationAdapter.Version;
+                #endregion
+
+                #region Build
+                case ProcessingPhase.BuildOrchestration: return buildAdapter.Version;
+                #endregion
+
+                #region Export
+                case ProcessingPhase.Export: return exportAdapter.Version;
+                #endregion
+                
+                #region Anything else
+                default: return -1;
+                #endregion
+            }
+        }
+
+        /// <summary>
+        /// Updates the processing pipeline until all objects have been finished
+        /// </summary>
+        internal static async Task Update(Component<ProcessingComponent> processingComponent)
+        {
+            do
+            {
+                // Process the most recent phase, then evaluate
+                if (discoveryAdapter.Count > 0)
+                {
+                    #region Discovery
+                    {
+                        current = ProcessingPhase.Discovery;
+                        if (!await discoveryAdapter.Flush(ValidateTargets))
+                        {
+                            // User decided to cancel execution
+                            break;
+                        }
+                    }
+                    #endregion
+                }
+                else if (parsingAdapter.Count > 0)
+                {
+                    #region Parsing
+                    {
+                        current = ProcessingPhase.Parsing;
+                        await parsingAdapter.Flush();
+                    }
+                    #endregion
+                }
+                else if (lintingAdapter.Count > 0)
+                {
+                    #region Linting
+                    {
+                        current = ProcessingPhase.Linting;
+                        await lintingAdapter.Flush();
+                    }
+                    #endregion
+                }
+                else if (analysisAdapter.Count > 0)
+                {
+                    #region Analysis
+                    {
+                        current = ProcessingPhase.Analysis;
+                        await analysisAdapter.Flush();
+                    }
+                    #endregion
+                }
+                else if (classificationAdapter.Count > 0)
+                {
+                    #region Classification
+                    {
+                        current = ProcessingPhase.Classification;
+                        await classificationAdapter.Flush();
+                    }
+                    #endregion
+                }
+                else if (buildAdapter.Count > 0)
+                {
+                    #region Build
+                    {
+                        current = ProcessingPhase.BuildOrchestration;
+                        await buildAdapter.Flush();
+                    }
+                    #endregion
+                }
+                else if (exportAdapter.Count > 0)
+                {
+                    #region Export
+                    {
+                        current = ProcessingPhase.Export;
+                        await exportAdapter.Flush();
+                    }
+                    #endregion
+                }
+
+                #region Schedule
+                {
+                    ReadOnlySpan<EntityId> entities = processingComponent.AsReadOnlySpan();
+                    ReadOnlySpan<ProcessingComponent> components = processingComponent.AsSpan();
+                    for (int i = 0; i < entities.Length; i++)
+                    {
+                        if (!components[i].IsCurrent)
+                        {
+                            processingComponent.Remove(entities[i--]);
+                            entities = processingComponent.AsReadOnlySpan();
+                            components = processingComponent.AsSpan();
+                        }
+                        else
+                            switch (components[i].Phase)
+                            {
+                                #region Discovery
+                                case ProcessingPhase.Discovery:
+                                    {
+                                        discoveryAdapter.Add(entities[i]);
+                                    }
+                                    break;
+                                #endregion
+
+                                #region Parsing
+                                case ProcessingPhase.Parsing:
+                                    {
+                                        parsingAdapter.Add(entities[i]);
+                                    }
+                                    break;
+                                #endregion
+
+                                #region Linting
+                                case ProcessingPhase.Linting:
+                                    {
+                                        lintingAdapter.Add(entities[i]);
+                                    }
+                                    break;
+                                #endregion
+
+                                #region Analysis
+                                case ProcessingPhase.Analysis:
+                                    {
+                                        analysisAdapter.Add(entities[i]);
+                                    }
+                                    break;
+                                #endregion
+
+                                #region Classification
+                                case ProcessingPhase.Classification:
+                                    {
+                                        classificationAdapter.Add(entities[i]);
+                                    }
+                                    break;
+                                #endregion
+
+                                #region Build
+                                case ProcessingPhase.BuildOrchestration:
+                                    {
+                                        buildAdapter.Add(entities[i]);
+                                    }
+                                    break;
+                                #endregion
+
+                                #region Export
+                                case ProcessingPhase.Export:
+                                    {
+                                        exportAdapter.Add(entities[i]);
+                                    }
+                                    break;
+                                #endregion
+                            }
+                    }
+                }
+                #endregion
+            }
+            // Loop while entities need to be processed
+            while (discoveryAdapter.Count > 0 ||
+                   parsingAdapter.Count > 0 ||
+                   lintingAdapter.Count > 0 ||
+                   analysisAdapter.Count > 0 ||
+                   classificationAdapter.Count > 0 ||
+                   buildAdapter.Count > 0 ||
+                   exportAdapter.Count > 0);
+
+            #region Cleanup
+            {
+                discoveryAdapter.Dispose();
+                parsingAdapter.Dispose();
+                lintingAdapter.Dispose();
+                analysisAdapter.Dispose();
+                classificationAdapter.Dispose();
+                buildAdapter.Dispose();
+                exportAdapter.Dispose();
+            }
+            #endregion
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static bool ValidateTargets(IReadOnlyIterable<HashSet.DefaultContainer<EntityId>, HashSet.ReadOnlyIteratorStrategy<EntityId, HashSet.DefaultContainer<EntityId>>> iterator)
+        {
+            int unresolvedTargets = 0;
+            foreach (EntityId entity in iterator)
+            {
+                if (entity.TryGetComponent(out Ref<TargetComponent> target) && !target.Value.Resolved)
+                {
+                    Application.Log(VerbosityFlags.Warning, SeverityFlags.Silent, string.Concat("Unable to resolve target '", target.Value.Identifier, "'"));
+                    unresolvedTargets++;
+                }
+            }
+            return (unresolvedTargets == 0 || Application.Prompt(PromptLocalisation.Default, PromptSettings.Default, "Continue anyway?")) ;
+        }
+    }
+}
